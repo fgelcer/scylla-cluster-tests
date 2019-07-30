@@ -406,7 +406,7 @@ class PerformanceRegressionTest(ClusterTester):
         # run a read workload
         self.create_test_stats()
         self.run_fstrim_on_all_db_nodes()
-        stress_queue = self.run_stress_thread(stress_cmd=base_cmd_r, stress_num=2, stats_aggregate_cmds=False)
+        stress_queue = self.run_stress_thread(stress_cmd=base_cmd_r, stress_num=7, stats_aggregate_cmds=False)
         results = self.get_stress_results(queue=stress_queue)
 
         self.update_test_details(scylla_conf=True)
