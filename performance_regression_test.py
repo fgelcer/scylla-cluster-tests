@@ -395,7 +395,8 @@ class PerformanceRegressionTest(ClusterTester):
         base_cmd_w = self.params.get('prepare_write_cmd')
         base_cmd_r = self.params.get('stress_cmd_r')
 
-        self.create_test_stats(sub_type='write-prepare')
+        if self.create_stats:
+            self.create_test_stats(sub_type='write-prepare')
         self.run_fstrim_on_all_db_nodes()
         # run a write workload
         stress_queue = self.run_stress_thread(stress_cmd=base_cmd_w, stress_num=2, prefix='preload-',
@@ -404,9 +405,10 @@ class PerformanceRegressionTest(ClusterTester):
         self.update_test_details()
 
         # run a read workload
-        self.create_test_stats()
+        if self.create_stats:
+            self.create_test_stats()
         self.run_fstrim_on_all_db_nodes()
-        stress_queue = self.run_stress_thread(stress_cmd=base_cmd_r, stress_num=7, stats_aggregate_cmds=False)
+        stress_queue = self.run_stress_thread(stress_cmd=base_cmd_r, stress_num=3, stats_aggregate_cmds=False)
         results = self.get_stress_results(queue=stress_queue)
 
         self.update_test_details(scylla_conf=True)

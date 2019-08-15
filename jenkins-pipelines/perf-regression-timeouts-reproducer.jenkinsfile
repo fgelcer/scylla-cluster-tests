@@ -9,8 +9,8 @@ longevityPipeline(
     backend: 'aws',
     aws_region: 'us-east-1',
     test_name: 'performance_regression_test.PerformanceRegressionTest.test_read',
-    test_config: 'test-cases/performance/perf-background-reads-overload.yaml',
+    test_config: 'test-cases/load/background-reads-overload.yaml',
 
-    timeout: [time: 60, unit: 'MINUTES'],
+    timeout: [time: 90, unit: 'MINUTES'],
     post_behaviour: 'keep'
 )
