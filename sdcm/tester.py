@@ -1022,8 +1022,7 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):
                                 protocol_version=protocol_version,
                                 load_balancing_policy=load_balancing_policy,
                                 default_retry_policy=FlakyRetryPolicy(),
-                                port=port, ssl_options=ssl_opts,
-                                connect_timeout=100)
+                                port=port, ssl_options=ssl_opts)
         session = cluster.connect()
 
         # temporarily increase client-side timeout to 1m to determine
@@ -1552,6 +1551,14 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):
             results = self.prometheusDB.query(query=q, start=starting_from, end=time.time())
             err_msg = "There were hint manager %s detected during the test!" % "drops" if "dropped" in q else "errors"
             assert any([float(v[1]) for v in results[0]["values"]]) is False, err_msg
+
+    def get_transport_requests_metrics(self, starting_from):
+        q_memory_available = ""
+        q_blocked_memory = ""
+        queries_to_check = [q_memory_available, q_blocked_memory]
+        for q in queries_to_check:
+            results = self.prometheusDB.query(query=q, start=starting_from, end=time.time())
+            self.log.info('results of my execution is {}'.format(results))
 
     def get_data_set_size(self, cs_cmd):
         """:returns value of n in stress comand, that is approximation and currently doesn't take in consideration
