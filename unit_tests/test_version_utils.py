@@ -36,3 +36,8 @@ class TestVersionUtils(unittest.TestCase):
         self.assertEqual(is_enterprise('2018'), True)
         self.assertEqual(is_enterprise('3.1'), False)
         self.assertEqual(is_enterprise('2.2'), False)
+
+    def test_manager_version(self):
+        print(get_branch_version(
+            'http://downloads.scylladb.com.s3.amazonaws.com/manager/rpm/unstable/centos/master/438/scylla-manager.repo'))
+        # needed .replace('\\', '') in get_branch_version_from_repo

@@ -588,8 +588,9 @@ class ScyllaManagerTool(ScyllaManagerBase):
         ip_addr_attr = 'public_ip_address'
         return [[n, getattr(n, ip_addr_attr)] for n in db_cluster.nodes]
 
-    def add_cluster(self, name, host=None, db_cluster=None, client_encrypt=None, user=None, create_user=None,  # pylint: disable=too-many-arguments
-                    single_node=False, disable_automatic_repair=False):
+    def add_cluster(self, name, host=None, db_cluster=None, client_encrypt=None, disable_automatic_repair=False,  # pylint: disable=too-many-arguments
+                    auth_token=None):
+        # , user = None, create_user = None, single_node=False,
         """
         :param name: cluster name
         :param host: cluster node IP
@@ -626,19 +627,19 @@ class ScyllaManagerTool(ScyllaManagerBase):
         if not any([host, db_cluster]):
             raise ScyllaManagerError("Neither host or db_cluster parameter were given to Manager add_cluster")
         host = host or self._get_cluster_hosts_ip(db_cluster=db_cluster)[0]
-        user = user or self.default_user
+        # user = user or self.default_user
         LOGGER.debug("Configuring ssh setup for cluster using {} node before adding the cluster: {}".format(host, name))
-        _, ssh_identity_file = self.scylla_mgr_ssh_setup(node_ip=host, user=user, create_user=create_user,
-                                                         single_node=single_node)
-        ssh_user = create_user or 'scylla-manager'
-        cmd = 'cluster add --host={} --ssh-identity-file={} --ssh-user={} --name={}'.format(host, ssh_identity_file,
-                                                                                            ssh_user, name)
+        # _, ssh_identity_file = self.scylla_mgr_ssh_setup(node_ip=host, user=user, create_user=create_user,
+        #                                                  single_node=single_node)
+        # ssh_user = create_user or 'scylla-manager'
+        cmd = 'cluster add --host={}  --name={} --auth-token {}'.format(
+            host, name, auth_token)
         # Adding client-encryption parameters if required
         if client_encrypt:
             if not db_cluster:
                 LOGGER.warning("db_cluster is not given. Scylla-Manager connection to cluster may "
                                "fail since not using client-encryption parameters.")
-            else:  # check if scylla-node has client-encrypt
+            else:  # check if scylla-node has client-encrypts
                 db_node, _ip = self._get_cluster_hosts_with_ips(db_cluster=db_cluster)[0]
                 if client_encrypt or db_node.is_client_encrypt:
                     cmd += " --ssl-user-cert-file {} --ssl-user-key-file {}".format(SSL_USER_CERT_FILE,
@@ -650,7 +651,7 @@ class ScyllaManagerTool(ScyllaManagerBase):
         cluster_id = res_cluster_add.stdout.split('\n')[0]
         # return ManagerCluster instance with the manager's new cluster-id
         manager_cluster = ManagerCluster(manager_node=self.manager_node, cluster_id=cluster_id,
-                                         client_encrypt=client_encrypt, ssh_identity_file=ssh_identity_file)
+                                         client_encrypt=client_encrypt)  # , ssh_identity_file=ssh_identity_file)
         if disable_automatic_repair:
             manager_cluster.delete_automatic_repair_task()
         return manager_cluster

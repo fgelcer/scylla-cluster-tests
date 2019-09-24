@@ -279,9 +279,13 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
             self.log.info('repair system_auth keyspace ...')
             node.run_nodetool(sub_cmd="repair", args="-- system_auth")
 
+        mgmt_auth_token = str(uuid4())
+        for node in self.db_cluster.nodes:
+            node.install_manager_agent(mgmt_auth_token, self.params.get("scylla_mgmt_repo"))
+
         db_node_address = self.db_cluster.nodes[0].ip_address
         self.loaders.wait_for_init(db_node_address=db_node_address)
-        self.monitors.wait_for_init()
+        self.monitors.wait_for_init(auth_token=mgmt_auth_token)
 
         # cancel reuse cluster - for new nodes added during the test
         cluster.Setup.reuse_cluster(False)
