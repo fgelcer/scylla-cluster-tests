@@ -28,6 +28,7 @@ import os
 import re
 import traceback
 from collections import OrderedDict
+from itertools import cycle
 
 from cassandra import InvalidRequest
 
@@ -1782,3 +1783,27 @@ COMPLEX_NEMESIS = [NoOpMonkey, ChaosMonkey,
                    AllMonkey, MdcChaosMonkey,
                    DisruptiveMonkey, NonDisruptiveMonkey, GeminiNonDisruptiveChaosMonkey,
                    GeminiChaosMonkey, NetworkMonkey]
+
+
+class ReproducePavelAssert(Nemesis):
+
+    def __init__(self, *args, **kwargs):
+        super(ReproducePavelAssert, self).__init__(*args, **kwargs)
+        self.disrupt_methods_list = cycle([
+            self.disrupt_hard_reboot_node,
+            self.disrupt_destroy_data_then_repair,
+            self.disrupt_stop_start_scylla_server,
+            self.disrupt_mgmt_repair_cli,
+            self.disrupt_terminate_and_replace_node,
+            self.disrupt_no_corrupt_repair,
+            self.disrupt_destroy_data_then_repair,
+            self.disrupt_restart_then_repair_node,
+            self.disrupt_validate_hh_short_downtime,  # here the reproducer shall stop
+            self.disrupt_nodetool_drain,
+            self.disrupt_nodetool_refresh,
+            self.disrupt_destroy_data_then_repair
+        ])
+
+    @log_time_elapsed_and_status
+    def disrupt(self):
+        next(self.disrupt_methods_list)()
