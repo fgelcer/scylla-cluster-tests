@@ -49,3 +49,6 @@ send_email: false
 email_recipients: ['qa@scylladb.com']
 
 collect_logs: false
+
+# instance profile name granting access for manager backup buckets
+aws_instance_profile_name: qa-scylla-manager-backup-instance-profile

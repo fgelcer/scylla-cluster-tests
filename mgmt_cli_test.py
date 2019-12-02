@@ -15,12 +15,14 @@
 
 import os
 import time
+import boto3
 
 from sdcm import mgmt
 from sdcm.mgmt import HostStatus, HostSsl, HostRestStatus, TaskStatus, ScyllaManagerError
 from sdcm.nemesis import MgmtRepair
 from sdcm.tester import ClusterTester
 from sdcm.cluster import Setup
+from sdcm.utils.common import _remote_get_file  # S3Storage
 
 
 class MgmtCliTest(ClusterTester):
@@ -86,6 +88,83 @@ class MgmtCliTest(ClusterTester):
         self.log.info("createing the table {} in the keyspace {}".format(table_name, keyspace_name))
 
         self.create_table(table_name, keyspace_name=keyspace_name)
+
+    def get_backup_files_to_download(self, prefix, local, bucket):
+        """
+            params:
+            - prefix: pattern to match in s3 (we should use here the cluster_id)
+            - local: local path to folder in which to place files
+            - bucket: s3 bucket with target contents
+            """
+        # {bucket}/backup/sst/cluster/{cluster_id}/dc/{region}/node/{node_id}/keyspace/
+        # [system_auth, system_distributed, system_traces]
+        s3_client = boto3.client('s3')
+        keys = []
+        dirs = []
+        results = s3_client.list_objects_v2(Bucket=bucket)
+        contents = results.get('Contents')
+        for content_list in contents:
+            content_key = content_list.get('Key')
+            if prefix in content_key:
+                if content_key[-1] != '/':
+                    keys.append(content_key)
+                else:
+                    dirs.append(content_key)
+        for dir in dirs:
+            self.log.info(f'creating directory {dir}')
+            dest_pathname = os.path.join(local, dir)
+            if not os.path.exists(os.path.dirname(dest_pathname)):
+                os.makedirs(os.path.dirname(dest_pathname))
+        for content_key in keys:
+            dest_pathname = os.path.join(local, content_key)
+            if not os.path.exists(os.path.dirname(dest_pathname)):
+                os.makedirs(os.path.dirname(dest_pathname))
+            s3_client.download_file(bucket, content_key, dest_pathname)
+        self.monitors.nodes[0].remoter._use_rsync = True
+        self.monitors.nodes[0].remoter.send_files(src=os.path.join(local, 'backup'), dst=local, verbose=False)
+
+    def download_file_from_backup_repo(self, local, bucket, cluster_id):
+        self.log.info('Will download files for each db machine')
+        cmd = '''sudo yum install -y python-pip
+                 sudo pip install awscli
+                 sudo pip install boto3'''
+        for node in self.db_cluster.nodes:
+            node.remoter.run(f'bash -cxe "{cmd}"')
+            # this command returns my region:
+            region_name = self.params.get('region_name')
+            # region_name = node.remoter.run('curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | '
+            #                                'grep region | awk -F\" \'{print $4}\'').stdout
+            node_id = node.remoter.run('nodetool info | grep ID | awk \'{print $3}\'')
+            node.remoter.run(f'aws s3 cp s3://{bucket}/backup/sst/cluster/{cluster_id}/dc/{region_name}/node/{node_id}'
+                             f'/keyspace/ {local}')
+
+    def test_restore(self):
+        pass
+
+    def is_backup_success(self, backup_task):
+        # could use the detailed_progress to track what is happening with backup_task
+        # self.log.info(f'Detailed_progress={backup_task.detailed_progress}')
+        backup_task.wait_for_status([TaskStatus.DONE])
+
+    def test_backup(self):
+        location_list = ['s3:manager-backup-tests-us']
+        manager_tool = mgmt.get_scylla_manager_tool(manager_node=self.monitors.nodes[0])
+        mgr_cluster = manager_tool.add_cluster(name=self.CLUSTER_NAME, db_cluster=self.db_cluster,
+                                               auth_token=self.monitors.mgmt_auth_token)
+        load = self._generate_load()
+        # FIXME ensure the load will run and finish, or it will be running during backup
+        backup_task = mgr_cluster.create_backup_task(location_list=location_list)
+        # backup_task.stop()
+        # # take md5sum from files
+        # backup_task.start()
+        self.log.info(f'task_status={backup_task.status}')
+        self.is_backup_success(backup_task=backup_task)
+        self.log.info(f'backup final status is {backup_task.status}')
+        local_dir = '/tmp'
+        self.download_file_from_backup_repo(local=local_dir, bucket=location_list[0].split(':')[1],
+                                            cluster_id=backup_task.cluster_id)
+
+        # self.run_restore_backup(location_list=location_list)
 
     def test_manager_sanity(self):
         """
@@ -234,9 +313,10 @@ class MgmtCliTest(ClusterTester):
     def _generate_load(self):
         self.log.info('Starting c-s write workload for 1m')
         stress_cmd = self.params.get('stress_cmd')
-        self.run_stress_thread(stress_cmd=stress_cmd, duration=5)
+        stress_thread = self.run_stress_thread(stress_cmd=stress_cmd, duration=5)
         self.log.info('Sleeping for 15s to let cassandra-stress run...')
         time.sleep(15)
+        return stress_thread
 
     def test_repair_multiple_keyspace_types(self):  # pylint: disable=invalid-name
         manager_tool = mgmt.get_scylla_manager_tool(manager_node=self.monitors.nodes[0])
