@@ -15,6 +15,7 @@
 
 import os
 import time
+import datetime
 from random import randint
 from invoke import exceptions
 
@@ -23,6 +24,7 @@ from sdcm.mgmt import HostStatus, HostSsl, HostRestStatus, TaskStatus, ScyllaMan
 from sdcm.nemesis import MgmtRepair, DbEventsFilter
 from sdcm.tester import ClusterTester
 from sdcm.cluster import Setup
+from sdcm.wait import wait_for
 
 
 # pylint: disable=too-many-public-methods
@@ -141,6 +143,8 @@ class MgmtCliTest(ClusterTester):
             self.test_backup_location_with_path()
         with self.subTest('Test Backup Rate Limit'):
             self.test_backup_rate_limit()
+        with self.subTest('Test Backup when there is no space left on disk'):
+            self.test_backup_enoscp()
 
     def update_cred_file(self):
         # FIXME: add to the nodes not in the same region as the bucket the bucket's region
@@ -186,6 +190,63 @@ class MgmtCliTest(ClusterTester):
         limit = 10
         after_restore = node.run_cqlsh(f'SELECT * FROM {keyspace_name}.{table_name} LIMIT {limit}').stdout
         assert len(after_restore.strip().splitlines()[2:-2]) == limit
+
+    def generate_enospc(self, nodes):
+        sleep_time = 30
+
+        def search_database_enospc(node):
+            """
+            Search database log by executing cmd inside node, use shell tool to
+            avoid return and process huge data.
+            """
+            cmd = "sudo journalctl --no-tail --no-pager -u scylla-server.service|grep 'No space left on device'|wc -l"
+            result = node.remoter.run(cmd, verbose=True)
+            return int(result.stdout)
+
+        def approach_enospc(node):
+            # get the size of free space (default unit: KB)
+            result = node.remoter.run("df -l|grep '/var/lib/scylla'")
+            free_space_size = result.stdout.split()[3]
+
+            occupy_space_size = int(int(free_space_size) * 90 / 100)
+            occupy_space_cmd = 'sudo fallocate -l {}K /var/lib/scylla/occupy_90percent.{}'.format(
+                occupy_space_size, datetime.datetime.now().strftime('%s'))
+            self.log.debug('Cost 90% free space on /var/lib/scylla/ by {}'.format(occupy_space_cmd))
+            try:
+                node.remoter.run(occupy_space_cmd, verbose=True)
+            except Exception as details:  # pylint: disable=broad-except
+                self.log.error(str(details))
+            return search_database_enospc(node) > orig_errors
+
+        for node in nodes:
+            with DbEventsFilter(type='NO_SPACE_ERROR', node=node), \
+                 DbEventsFilter(type='BACKTRACE', line='No space left on device', node=node), \
+                 DbEventsFilter(type='DATABASE_ERROR', line='No space left on device', node=node), \
+                 DbEventsFilter(type='FILESYSTEM_ERROR', line='No space left on device', node=node):
+
+                result = node.remoter.run('cat /proc/mounts')
+                if '/var/lib/scylla' not in result.stdout:
+                    self.log.error("Scylla doesn't use an individual storage, skip enospc test")
+                    continue
+
+                # check original ENOSPC error
+                orig_errors = search_database_enospc(node)
+                wait_for(func=approach_enospc,
+                         timeout=300,
+                         step=5,
+                         text='Wait for new ENOSPC error occurs in database',
+                         node=node)
+
+                self.log.debug('Sleep {} seconds before releasing space to scylla'.format(sleep_time))
+                time.sleep(sleep_time)
+
+                self.log.debug('Delete occupy_90percent file to release space to scylla-server')
+                node.remoter.run('sudo rm -rf /var/lib/scylla/occupy_90percent.*')
+
+                self.log.debug('Sleep a while before restart scylla-server')
+                time.sleep(sleep_time / 2)
+                node.remoter.run('sudo systemctl restart scylla-server.service')
+                node.wait_db_up()
 
     def test_basic_backup(self):
         self.log.info('starting test_basic_backup')
@@ -247,6 +308,24 @@ class MgmtCliTest(ClusterTester):
         # TODO: verify that the rate limit is as set in the cmd
         self.verify_backup_success(bucket=location_list[0].split(':')[1], cluster_id=backup_task.cluster_id)
         self.log.info('finishing test_backup_rate_limit')
+
+    def test_backup_enoscp(self):
+        # TODO: add this test to the test_backup
+        self.log.info('starting test_backup_enoscp')
+        self.update_cred_file()
+        location_list = ['s3:manager-backup-tests-us']
+        manager_tool = mgmt.get_scylla_manager_tool(manager_node=self.monitors.nodes[0])
+        mgr_cluster = manager_tool.add_cluster(name=self.CLUSTER_NAME + '_enospc', db_cluster=self.db_cluster,
+                                               auth_token=self.monitors.mgmt_auth_token)
+        self._generate_load()
+        # this will generate enospc
+        self.generate_enospc([self.db_cluster.nodes[0]])
+        # TODO: clean the used space?
+        backup_task = mgr_cluster.create_backup_task({'location': location_list})
+        task_status = backup_task.wait_and_get_final_status()
+        self.log.info(f'backup task finished with status {task_status}')
+        self.verify_backup_success(bucket=location_list[0].split(':')[1], cluster_id=backup_task.cluster_id)
+        self.log.info('finishing test_backup_enoscp')
 
     def test_client_encryption(self):
         self.log.info('starting test_client_encryption')
