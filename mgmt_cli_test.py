@@ -145,7 +145,8 @@ class MgmtCliTest(ClusterTester):
         with self.subTest('Backup to Location with path'):
             self.test_backup_location_with_path()
         with self.subTest('Test Backup Rate Limit'):
-            self.test_backup_rate_limit()
+            self.log.info('skipping test_backup_rate_limit: https://github.com/scylladb/mermaid/issues/1485')
+            # self.test_backup_rate_limit()
 
     def update_cred_file(self):
         # FIXME: add to the nodes not in the same region as the bucket the bucket's region
