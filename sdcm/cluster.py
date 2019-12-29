@@ -4291,7 +4291,10 @@ class BaseMonitorSet():  # pylint: disable=too-many-public-methods,too-many-inst
 
         def _register_grafana_json(json_filename):
             # added "[]" / "\\" for IPv6 support
-            url = "'http://\\[{0.external_address}\\]:{1.grafana_port}/api/dashboards/db'".format(node, self)
+            external_address = node.external_address
+            if self.params.get('ip_ssh_connections') == 'ipv6':
+                external_address = f'\\[{external_address}\\]'
+            url = "'http://{0}:{1.grafana_port}/api/dashboards/db'".format(external_address, self)
             result = LOCALRUNNER.run('curl -XPOST -i %s --data-binary @%s -H "Content-Type: application/json"' %
                                      (url, json_filename))
             return result.exited == 0

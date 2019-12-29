@@ -1,5 +1,4 @@
 import time
-from invoke import exceptions
 from sdcm.tester import ClusterTester
 from sdcm.db_stats import PrometheusDBStats
 
@@ -17,20 +16,13 @@ class AdmissionControlOverloadTest(ClusterTester):
 
         is_admission_control_triggered = False
         for node in node_procs_res:
-            if any(values[1] for values in node['values']):
+            if any(int(values[1]) for values in node['values']):
+                self.log.info(f"metric={node_procs_blocked} | value={node['values']}")
                 self.log.info('Admission control was triggered')
                 is_admission_control_triggered = True
+                break
 
         return is_admission_control_triggered
-
-    def kill_load(self):
-        for loader in self.loaders.nodes:
-            cs_process_list = loader.remoter.run('sudo pgrep -f cassandra-stress',
-                                                 ignore_status=True).stdout.splitlines()
-            self.log.debug(f'c-s process id list = {cs_process_list}')
-            processes_to_kill = ' '.join(cs_process_list)
-            kill_process_res = loader.remoter.run(f'sudo kill -9 {processes_to_kill}', ignore_status=True)
-            self.log.debug(f'kill c-s processes res = {kill_process_res}')
 
     def run_load(self, job_num, job_cmd, is_prepare=False):
         if is_prepare:
@@ -39,32 +31,26 @@ class AdmissionControlOverloadTest(ClusterTester):
             self.get_stress_results(prepare_stress_queue)
             is_ever_triggered = False
         else:
-            stress_queue = []
-            stress_res = []
-            stress_queue.append(self.run_stress_thread(stress_cmd=job_cmd, stress_num=job_num,
-                                                       stats_aggregate_cmds=False))
+            stress_queue = self.run_stress_thread(stress_cmd=job_cmd, stress_num=job_num,
+                                                  stats_aggregate_cmds=False)
 
             start_time = time.time()
             is_ever_triggered = False
-            while stress_queue:
-                stress_res.append(stress_queue.pop(0))
-                while not all(future.done() for future in stress_res[-1].results_futures):
-                    now = time.time()
-                    if self.check_prometheus_metrics(start_time=start_time, now=now):
-                        is_ever_triggered = True
-                        self.log.info('killing all the load on all loaders')
-                        self.kill_load()
-                        break
-                    start_time = now
-                    time.sleep(10)
 
-            if not is_ever_triggered:
-                results = []
-                for stress in stress_res:
-                    try:
-                        results.append(self.get_stress_results(stress))
-                    except exceptions.CommandTimedOut as ex:
-                        self.log.debug('some c-s timed out\n{}'.format(ex))
+            # wait 2 minutes to let all the stress to start
+            time.sleep(120)
+
+            while not all(future.done() for future in list(stress_queue.results_futures)):
+                now = time.time()
+                if self.check_prometheus_metrics(start_time=start_time, now=now):
+                    is_ever_triggered = True
+                    self.log.info('killing all the load on all loaders')
+                    stress_queue.kill()
+                    break
+                start_time = now
+                time.sleep(10)
+            else:
+                self.get_stress_results(queue=stress_queue, store_results=False)
 
         return is_ever_triggered
 
@@ -90,7 +76,8 @@ class AdmissionControlOverloadTest(ClusterTester):
         base_cmd_prepare = self.params.get('prepare_write_cmd')
         base_cmd_r = self.params.get('stress_cmd_r')
 
-        self.run_admission_control(base_cmd_prepare, base_cmd_r, job_num=12)
+        # self.run_admission_control(base_cmd_prepare, base_cmd_r, job_num=12)
+        self.run_admission_control(None, base_cmd_r, job_num=16)
         self.log.debug('Finished running read test')
 
     def write_admission_control_load(self):
@@ -101,19 +88,21 @@ class AdmissionControlOverloadTest(ClusterTester):
         self.log.debug('Started running write test')
         base_cmd_w = self.params.get('stress_cmd_w')
 
-        self.run_admission_control(None, base_cmd_w, job_num=12)
+        self.run_admission_control(None, base_cmd_w, job_num=10)
         self.log.debug('Finished running write test')
 
     def test_admission_control(self):
         self.write_admission_control_load()
 
-        # giving some time for the load to calm down
-        time.sleep(10)
+        self.log.info('will give few seconds to everything settle down')
+        time.sleep(120)
+
+        self.log.info('restarting scylla-server')
         node = self.db_cluster.nodes[0]
-        node.stop_scylla(verify_up=False, verify_down=True)
-        node.start_scylla(verify_up=True)
-        self.log.info('will give few seconds to everything come back to it\'s place')
-        time.sleep(240)
+        node.restart_scylla_server(ignore_status=True)
+
+        self.log.info('giving 1 minute as JMX issue workaround')
+        time.sleep(60)
 
         self.read_admission_control_load()
         self.log.info('Admission Control Test has finished with success')
