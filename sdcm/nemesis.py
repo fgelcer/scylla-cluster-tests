@@ -1849,9 +1849,7 @@ class MgmtBackup(Nemesis):
 
     @log_time_elapsed_and_status
     def disrupt(self):
-        self.log.info('disrupt_mgmt_backup Nemesis begin')
         self.disrupt_mgmt_backup()
-        self.log.info('disrupt_mgmt_backup Nemesis end')
 
 
 class MgmtRepair(Nemesis):
