@@ -10,7 +10,7 @@ n_monitor_nodes: 1
 
 instance_type_db: 'i3en.3xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
+nemesis_class_name: 'RestartThenRepairNodeMonkey'
 nemesis_interval: 30
 
 user_prefix: 'longevity-large-partitions-4d'
