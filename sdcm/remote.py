@@ -146,6 +146,8 @@ class LocalCmdRunner(CommandRunner):  # pylint: disable=too-few-public-methods
         watchers = []
         if verbose:
             watchers.append(OutputWatcher(self.log))
+        if log_file:
+            watchers.append(LogWriteWatcher(log_file))
         start_time = time.time()
         if verbose:
             self.log.debug('Running command "{}"...'.format(cmd))
