@@ -106,7 +106,7 @@ class CommandRunner:
         return '{} [{}@{}]'.format(self.__class__.__name__, self.user, self.hostname)
 
     def run(self, cmd, timeout=None, ignore_status=False,  # pylint: disable=too-many-arguments
-            connect_timeout=300, verbose=True, log_file=None, retry=0):
+            connect_timeout=300, verbose=True, log_file=None, retry=0, watchers=None):
         raise NotImplementedError("Should be implemented in subclasses")
 
     def _create_connection(self):
@@ -141,9 +141,9 @@ class LocalCmdRunner(CommandRunner):  # pylint: disable=too-few-public-methods
         return Connection(host=self.hostname, user=self.user)
 
     def run(self, cmd, timeout=300, ignore_status=False,  # pylint: disable=too-many-arguments
-            connect_timeout=300, verbose=True, log_file=None, retry=0):
+            connect_timeout=300, verbose=True, log_file=None, retry=0, watchers=None):
 
-        watchers = []
+        watchers = watchers if watchers else []
         if verbose:
             watchers.append(OutputWatcher(self.log))
         if log_file:
@@ -226,7 +226,7 @@ class RemoteCmdRunner(CommandRunner):  # pylint: disable=too-many-instance-attri
             return "SSH access -> 'ssh %s@%s'" % (self.user,
                                                   self.hostname)
 
-    def run(self, cmd, timeout=None, ignore_status=False,  # pylint: disable=too-many-arguments,arguments-differ
+    def run(self, cmd, timeout=None, ignore_status=False,  # pylint: disable=too-many-arguments
             connect_timeout=300, verbose=True,
             log_file=None, retry=1, watchers=None, new_session=False):
         self.connection.connect_timeout = connect_timeout
