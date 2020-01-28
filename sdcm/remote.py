@@ -106,7 +106,7 @@ class CommandRunner:
         return '{} [{}@{}]'.format(self.__class__.__name__, self.user, self.hostname)
 
     def run(self, cmd, timeout=None, ignore_status=False,  # pylint: disable=too-many-arguments
-            connect_timeout=300, verbose=True, log_file=None, retry=0, watchers=None):
+            connect_timeout=300, verbose=True, log_file=None, retry=0, watchers=None, new_session=False):
         raise NotImplementedError("Should be implemented in subclasses")
 
     def _create_connection(self):
@@ -141,7 +141,7 @@ class LocalCmdRunner(CommandRunner):  # pylint: disable=too-few-public-methods
         return Connection(host=self.hostname, user=self.user)
 
     def run(self, cmd, timeout=300, ignore_status=False,  # pylint: disable=too-many-arguments
-            connect_timeout=300, verbose=True, log_file=None, retry=0, watchers=None):
+            connect_timeout=300, verbose=True, log_file=None, retry=0, watchers=None, new_session=False):
 
         watchers = watchers if watchers else []
         if verbose:
@@ -157,7 +157,8 @@ class LocalCmdRunner(CommandRunner):  # pylint: disable=too-few-public-methods
                                            hide=True,
                                            watchers=watchers,
                                            timeout=timeout,
-                                           env=os.environ, replace_env=True)
+                                           env=os.environ, replace_env=True,
+                                           in_stream=False)
 
         except (Failure, UnexpectedExit) as details:
             if hasattr(details, "result"):
