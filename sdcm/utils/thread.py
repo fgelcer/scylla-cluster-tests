@@ -44,6 +44,7 @@ class DockerBasedStressThread:  # pylint: disable=too-many-instance-attributes
         self.results_futures = []
         self.max_workers = 0
         self.shell_marker = generate_random_string(20)
+        self.shutdown_timeout = 180  # extra 3 minutes
 
     def run(self):
         if self.round_robin:

@@ -117,7 +117,7 @@ class NdBenchStressThread(DockerBasedStressThread):  # pylint: disable=too-many-
 
             with NdBenchStatsPublisher(loader, loader_idx, ndbench_log_filename=log_file_name):
                 result = docker.run(cmd=node_cmd,
-                                    timeout=self.timeout + 60,
+                                    timeout=self.timeout + self.shutdown_timeout,
                                     ignore_status=True,
                                     log_file=log_file_name,
                                     verbose=True,

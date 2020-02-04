@@ -47,8 +47,10 @@ class YcsbStatsPublisher(FileFollowerThread):
         verify_regex = re.compile(r'\[VERIFY:(.*?)\]')
         verify_content = verify_regex.findall(line)[0]
 
+        logging.info(verify_content)
         for status_match in verify_status_regex.finditer(verify_content):
             stat = status_match.groupdict()
+            logging.info(stat)
             self.set_metric('verify', stat['status'], float(stat['value']))
 
     def run(self):
@@ -87,7 +89,11 @@ class YcsbStatsPublisher(FileFollowerThread):
 
                             for key, value in match.groupdict().items():
                                 if not key == 'count':
-                                    value = float(value) / 1000.0
+                                    try:
+                                        value = float(value) / 1000.0
+                                    except ValueError:
+                                        LOGGER.exception("value isn't a number, default to 0")
+                                        value = float(0)
                                 self.set_metric(operation, key, float(value))
 
                 except Exception:  # pylint: disable=broad-except
@@ -167,7 +173,7 @@ class YcsbStressThread(DockerBasedStressThread):  # pylint: disable=too-many-ins
 
             with YcsbStatsPublisher(loader, loader_idx, ycsb_log_filename=log_file_name):
                 result = docker.run(cmd=node_cmd,
-                                    timeout=self.timeout + 60,
+                                    timeout=self.timeout + self.shutdown_timeout,
                                     log_file=log_file_name,
                                     watchers=[FailuresWatcher(r'ERROR|UNEXPECTED_STATE', callback=raise_event_callback, raise_exception=False)])
         finally:
