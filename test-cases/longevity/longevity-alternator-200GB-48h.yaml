@@ -1,4 +1,4 @@
-test_duration: 180
+test_duration: 3000
 prepare_write_cmd: [
   "bin/ycsb load dynamodb -P workloads/workloada -threads 250 -p recordcount=200200300 -p fieldcount=1 -p fieldlength=1024 -p dataintegrity=true -p hdrhistogram.summary.addstatus=true", ]
 stress_cmd: [
