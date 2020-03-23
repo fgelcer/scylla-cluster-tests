@@ -2183,6 +2183,15 @@ class ToggleTableIcsMonkey(Nemesis):
         self.disrupt_toggle_table_ics()
 
 
+class FabioTest(Nemesis):
+    disruptive = False
+
+    @log_time_elapsed_and_status
+    def disrupt(self):
+        test = random.choice([self.disrupt_mgmt_backup, self.disrupt_nodetool_decommission])
+        test()
+
+
 class MgmtBackup(Nemesis):
     disruptive = False
 
