@@ -1576,6 +1576,7 @@ class BaseNode():  # pylint: disable=too-many-instance-attributes,too-many-publi
         with open(yaml_dst_path, 'r') as scylla_yaml_file:
             scylla_yml = yaml.safe_load(scylla_yaml_file)
 
+        scylla_yml['rpc_address'] = self.private_ip_address
         if seed_address:
             # Set seeds
             scylla_yml['seed_provider'] = [
