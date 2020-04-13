@@ -29,7 +29,7 @@ n_monitor_nodes: 1
 instance_type_db: 'i3.4xlarge'
 instance_type_loader: 'c5.4xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
+nemesis_class_name: 'NodeTerminateAndReplace'
 nemesis_interval: 30
 
 user_prefix: 'longevity-tls-1tb-7d'
