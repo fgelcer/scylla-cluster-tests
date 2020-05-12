@@ -112,12 +112,6 @@ class EC2Client():
                              'InstanceType': instance_type,
                              'NetworkInterfaces': network_if,
                              'Placement': {'AvailabilityZone': region_name},
-                             'TagSpecifications': [
-                                 {
-                                     'ResourceType': 'instance',
-                                     'Tags': tags_list
-                                 }
-                             ]
                              },
                         ],
                         'IamFleetRole': 'arn:aws:iam::797456418907:role/aws-ec2-spot-fleet-role',
@@ -125,13 +119,13 @@ class EC2Client():
                         'TargetCapacity': count,
                         }
         if aws_instance_profile:
-            fleet_config['LaunchSpecifications'][0]['IamInstanceProfile'] = {'Name': aws_instance_profile}
+            fleet_config['LaunchSpecifications'][0].update({'IamInstanceProfile': {'Name': aws_instance_profile}})
         if key_pair:
             fleet_config['LaunchSpecifications'][0].update({'KeyName': key_pair})
         if user_data:
             fleet_config['LaunchSpecifications'][0].update({'UserData': self._encode_user_data(user_data)})
         if block_device_mappings:
-            fleet_config['LaunchSpecifications'][0]['BlockDeviceMappings'] = block_device_mappings
+            fleet_config['LaunchSpecifications'][0].update({'BlockDeviceMappings': block_device_mappings})
         LOGGER.info('Sending spot fleet request with params: %s', fleet_config)
         resp = self._client.request_spot_fleet(DryRun=False,
                                                SpotFleetRequestConfig=fleet_config)
@@ -356,7 +350,7 @@ class EC2Client():
 
         request_id = self._request_spot_fleet(instance_type, image_id, region_name, network_if, key_pair,
                                               user_data, count, block_device_mappings=block_device_mappings,
-                                              tags_list=tags_list, aws_instance_profile=aws_instance_profile)
+                                              aws_instance_profile=aws_instance_profile)
         instance_ids, resp = self._wait_for_fleet_request_done(request_id)
         if not instance_ids:
             err_code = MAX_SPOT_EXCEEDED_ERROR if resp == FLEET_LIMIT_EXCEEDED_ERROR else STATUS_ERROR
