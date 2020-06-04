@@ -1,0 +1,26 @@
+test_duration: 300
+
+cs_duration: '10m'
+cs_user_profiles:
+    - scylla-qa-internal/cust_d/templated_tables_mv.yaml
+
+user_profile_table_count: 50
+batch_size: 10
+
+n_loaders: 1
+n_monitor_nodes: 1
+n_db_nodes: 1
+add_node_cnt: 3
+
+instance_type_db: 'i3.large'
+instance_type_loader: 'c5.large'
+user_prefix: 'bootstrap-delay-compaction'
+
+cluster_health_check: false
+
+nemesis_class_name: 'NoOpMonkey'
+nemesis_interval: 60
+
+store_results_in_elasticsearch: False
+
+append_scylla_args: '--blocked-reactor-notify-ms 500'
