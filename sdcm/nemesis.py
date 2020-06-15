@@ -432,13 +432,13 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         disable_autocompaction = random.choice([True, False])
         keyspaces = self.cluster.get_test_keyspaces()
         try:
+            self.cluster.wait_for_init(node_list=[new_node], timeout=timeout, wait_db_up=False)
             if disable_autocompaction:
                 self.log.info(f'during bootstrap, autocompaction will be disabled for keyspaces {keyspaces}')
-                new_node.wait_ssh_up()
-                new_node.wait_jmx_up()
                 for keyspace in keyspaces:
                     new_node.run_nodetool(sub_cmd='disableautocompaction', args=keyspace, ignore_status=True)
-            self.cluster.wait_for_init(node_list=[new_node], timeout=timeout)
+            new_node.wait_db_up(timeout=timeout)
+            self.cluster.clean_replacement_node_ip(new_node)
         except (NodeSetupFailed, NodeSetupTimeout):
             self.log.warning("Setup of the '%s' failed, removing it from list of nodes" % new_node)
             self.cluster.nodes.remove(new_node)
