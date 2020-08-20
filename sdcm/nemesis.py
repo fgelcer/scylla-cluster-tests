@@ -2419,6 +2419,15 @@ class ChaosMonkey(Nemesis):
         self.call_random_disrupt_method()
 
 
+class FabioChaosMonkey(Nemesis):
+
+    @log_time_elapsed_and_status
+    def disrupt(self):
+        self.call_random_disrupt_method(disrupt_methods=['disrupt_nodetool_decommission',
+                                                         'disrupt_terminate_and_replace_node',
+                                                         'disrupt_grow_shrink_cluster'])
+
+
 class LimitedChaosMonkey(Nemesis):
 
     @log_time_elapsed_and_status
