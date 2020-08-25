@@ -12,7 +12,7 @@ n_monitor_nodes: 1
 
 instance_type_db: 'i3.4xlarge'
 
-nemesis_class_name: 'ChaosMonkey'
+nemesis_class_name: 'SslHotReloadingNemesis'
 nemesis_interval: 5
 nemesis_filter_seeds: false
 seeds_num: 3
@@ -20,6 +20,7 @@ seeds_num: 3
 user_prefix: 'longevity-100gb-4h'
 space_node_threshold: 64424
 
+server_encrypt: true
 use_mgmt: true
 pre_create_schema: True
 sstable_size: 100
