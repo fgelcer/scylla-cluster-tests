@@ -2222,6 +2222,7 @@ class ClusterTester(db_stats.TestStatsMixin, unittest.TestCase):  # pylint: disa
             self.db_cluster.latency_results = calculate_latency(self.db_cluster.latency_results)
             self.log.debug(f'collected latency are: {self.db_cluster.latency_results}')
             self.update({"latency_during_ops": self.db_cluster.latency_results})
+            self.update({"events": get_events_grouped_by_category(_registry=self.events_processes_registry)})
             self.update_test_details()
             results_analyzer.check_regression(test_id=self._test_id, data=self.db_cluster.latency_results)
 

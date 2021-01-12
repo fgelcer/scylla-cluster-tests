@@ -157,8 +157,21 @@ class LatencyDuringOperationsPerformanceAnalyzer(BaseResultsAnalyzer):
         test_start_time = datetime.utcfromtimestamp(float(doc["_source"]["test_details"]["start_time"]))
         test_version_info = self._test_version(doc)
         test_version = test_version_info['version']
-        subject = f'Performance Regression Compare Results - {test_name} - {test_version} - {str(test_start_time)}'
+        last_events = dict()
+        events_summary = dict()
+        last_events['CRITICAL'] = doc["_source"]["events"]["CRITICAL"]
+        events_summary['CRITICAL'] = len(last_events['CRITICAL'])
+
+        last_events['ERROR'] = doc["_source"]["events"]["ERROR"]
+        events_summary['ERROR'] = len(last_events['ERROR'])
+
+        last_events['WARNING'] = doc["_source"]["events"]["WARNING"]
+        events_summary['WARNING'] = len(last_events['WARNING'])
+        subject = f'Performance Regression Compare Results (latency during mgmt ops) -' \
+                  f' {test_name} - {test_version} - {str(test_start_time)}'
         results = dict(
+            events_summary=events_summary,
+            last_events=last_events,
             stats=data,
             test_name=full_test_name,
             test_start_time=str(test_start_time),

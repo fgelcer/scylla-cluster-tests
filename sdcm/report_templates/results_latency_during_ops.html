@@ -61,6 +61,23 @@
             {% endfor %}
         </div>
 
+    <div>
+        {% if last_events %}
+            <h3>
+                <span>Last events by severity</span>
+            </h3>
+            {% for severity, events in last_events.items() %}
+                <h4>
+                {{ severity }} - [{{ events_summary.get(severity, 0) }}]
+                </h4>
+                {% for event in events %}
+                    <pre>{{event}}</pre>
+                    <hr>
+                {% endfor %}
+            {% endfor %}
+        {% endif %}
+    </div>
+
     <h3>Links:</h3>
     <ul>
         <li><a href="{{ job_url }}">Jenkins job</a></li>
