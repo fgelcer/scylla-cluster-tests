@@ -426,6 +426,9 @@ class SCTConfiguration(dict):
         dict(name="nemesis_sequence_sleep_between_ops", env="SCT_NEMESIS_SEQUENCE_SLEEP_BETWEEN_OPS", type=int,
              help="""Sleep interval between nemesis operations for use in unique_sequence nemesis kind of tests"""),
 
+        dict(name="nemesis_loop_count", env="SCT_NEMESIS_LOOP_COUNT", type=int,
+             help="""The number of nemesis cycles to run during a specific test"""),
+
         dict(name="nemesis_during_prepare", env="SCT_NEMESIS_DURING_PREPARE", type=boolean,
              help="""Run nemesis during prepare stage of the test"""),
 

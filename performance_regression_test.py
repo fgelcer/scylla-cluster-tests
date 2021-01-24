@@ -235,9 +235,9 @@ class PerformanceRegressionTest(ClusterTester):  # pylint: disable=too-many-publ
             time.sleep(interval * 60)  # Sleeping one interval (in minutes) before starting the nemesis
             self.db_cluster.add_nemesis(nemesis=self.get_nemesis_class(), tester_obj=self)
             self.db_cluster.start_nemesis(interval=interval)
-        results = self.get_stress_results(queue=stress_queue)
+        # results = self.get_stress_results(queue=stress_queue)
         self.update_test_details(scrap_metrics_step=60)
-        self.display_results(results, test_name='test_latency' if not nemesis else 'test_latency_with_nemesis')
+        # self.display_results(results, test_name='test_latency' if not nemesis else 'test_latency_with_nemesis')
         check_latency = self.check_regression if not nemesis else self.check_latency_during_ops
         check_latency()
 

@@ -123,6 +123,7 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         self.interval = 60 * self.tester.params.get('nemesis_interval')  # convert from min to sec
         self.start_time = time.time()
         self.stats = {}
+        self.nemesis_cycles = 0
         self.metrics_srv = nemesis_metrics_obj()
         self.task_used_streaming = None
         self.filter_seed = self.cluster.params.get('nemesis_filter_seeds')
@@ -270,14 +271,20 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.interval = interval * 60
         self.log.info('Interval: %s s', self.interval)
         while not self.termination_event.is_set():
-            cur_interval = self.interval
-            self.set_target_node()
-            self._set_current_disruption(report=False)
-            try:
-                self.disrupt()
-            except UnsupportedNemesis:
-                cur_interval = 0
-            finally:
+            if self.cluster.params.get('nemesis_loop_count') == 0 or \
+                    self.nemesis_cycles < self.cluster.params.get('nemesis_loop_count'):
+                cur_interval = self.interval
+                self.set_target_node()
+                self._set_current_disruption(report=False)
+                try:
+                    self.disrupt()
+                except UnsupportedNemesis:
+                    cur_interval = 0
+                finally:
+                    self.unset_current_running_nemesis(self.target_node)
+                    self.termination_event.wait(timeout=cur_interval)
+                self.nemesis_cycles = self.nemesis_cycles + 1
+            else:
                 self.unset_current_running_nemesis(self.target_node)
                 self.termination_event.wait(timeout=cur_interval)
 
@@ -2650,24 +2657,34 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         time.sleep(sleep_time)
         InfoEvent(message='FinishEvent - Steady State sleep has been finished').publish()
 
+    @latency_calculator_decorator
+    def stam(self):
+        self._set_current_disruption('StamFunction')
+        InfoEvent(message=f'StartEvent - start a stam function').publish()
+        time.sleep(60)
+        InfoEvent(message='FinishEvent - stam function has ended').publish()
+
     def disrupt_run_unique_sequence(self):
         sleep_time_between_ops = self.cluster.params.get('nemesis_sequence_sleep_between_ops')
         sleep_time_between_ops = sleep_time_between_ops if sleep_time_between_ops else 8
         sleep_time_between_ops = sleep_time_between_ops * 60
+        # FIXME: it is not working, as the mechanism added here prevented anything after steady state to run
         if not self.has_steady_run:
             self.steady_state_latency()
             self.has_steady_run = True
-        InfoEvent(message='StartEvent - start a repair by ScyllaManager').publish()
-        self.disrupt_mgmt_repair_cli()
-        InfoEvent(message='FinishEvent - Manager repair has finished').publish()
         time.sleep(sleep_time_between_ops)
-        InfoEvent(message='Starting terminate_and_replace disruption').publish()
-        self.disrupt_terminate_and_replace_node()
-        InfoEvent(message='Finished terminate_and_replace disruption').publish()
-        time.sleep(sleep_time_between_ops)
-        InfoEvent(message='Starting grow_shrink disruption').publish()
-        self.disrupt_grow_shrink_cluster()
-        InfoEvent(message="Finished grow_shrink disruption").publish()
+        self.stam()
+        # InfoEvent(message='StartEvent - start a repair by ScyllaManager').publish()
+        # self.disrupt_mgmt_repair_cli()
+        # InfoEvent(message='FinishEvent - Manager repair has finished').publish()
+        # time.sleep(sleep_time_between_ops)
+        # InfoEvent(message='Starting terminate_and_replace disruption').publish()
+        # self.disrupt_terminate_and_replace_node()
+        # InfoEvent(message='Finished terminate_and_replace disruption').publish()
+        # time.sleep(sleep_time_between_ops)
+        # InfoEvent(message='Starting grow_shrink disruption').publish()
+        # self.disrupt_grow_shrink_cluster()
+        # InfoEvent(message="Finished grow_shrink disruption").publish()
 
     def disrupt_memory_stress(self):
         """
